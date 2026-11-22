@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EV Charge">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>EV Charge Calculator</title>
+<style>
+:root{color-scheme:dark;--bg:#101820;--panel:#1b2732;--muted:#9eacb8;--accent:#65d6a2;--text:#f4f7f9}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 18px env(safe-area-inset-bottom)}
+main{max-width:480px;margin:0 auto;padding:26px 0 34px}.top{display:flex;align-items:center;gap:12px;margin-bottom:24px}.logo{width:46px;height:46px;border-radius:14px;background:#243b37;display:grid;place-items:center;color:var(--accent);font-size:25px}.eyebrow{color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}.title{font-size:23px;font-weight:750;margin-top:3px}
+.card{background:var(--panel);border:1px solid #2a3945;border-radius:20px;padding:18px;margin:14px 0}.field{margin:15px 0}.label{display:flex;justify-content:space-between;align-items:center;color:#dce4e9;font-size:14px;margin-bottom:9px}.value{font-weight:700;color:var(--accent);font-size:20px;font-variant-numeric:tabular-nums}
+input{width:100%;background:#111b23;color:var(--text);border:1px solid #394956;border-radius:12px;padding:14px;font:inherit;font-size:18px;outline:none}input:focus{border-color:var(--accent)}.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+button{width:100%;border:0;border-radius:14px;background:var(--accent);color:#102019;padding:16px;font-size:17px;font-weight:800;margin-top:8px}
+.result{background:#20352f;border:1px solid #38634f;border-radius:18px;padding:18px;margin-top:16px}.result small{color:#b8d8c8}.duration{font-size:34px;font-weight:800;margin:6px 0 14px;font-variant-numeric:tabular-nums}.endtime{font-size:42px;font-weight:850;color:var(--accent);font-variant-numeric:tabular-nums}.hidden{display:none}.footer{color:var(--muted);font-size:11px;line-height:1.5;margin:18px 4px}
+</style>
+</head>
+<body>
+<main>
+ <div class="top"><div class="logo">⚡</div><div><div class="eyebrow">Electric vehicle</div><div class="title">EV Charge Calculator</div></div></div>
+ <section class="card">
+  <div class="field"><div class="label"><span>Текущий заряд</span><span class="value" id="currentLabel">24%</span></div><input id="current" type="range" min="0" max="99" value="24" style="padding:0;accent-color:#65d6a2"><div class="hint">Передвинь ползунок или нажми на него.</div></div>
+  <div class="field"><div class="label"><span>Желаемый заряд</span><span class="value" id="targetLabel">90%</span></div><input id="target" type="range" min="1" max="100" value="90" style="padding:0;accent-color:#65d6a2"></div>
+  <div class="field"><div class="label">Время до 100% по приборке</div><div class="pair"><input id="hours" type="number" min="0" max="999" inputmode="numeric" value="17" aria-label="Часы"><input id="minutes" type="number" min="0" max="59" inputmode="numeric" value="32" aria-label="Минуты"></div><div class="hint">Часы слева, минуты справа.</div></div>
+  <div class="field"><div class="label">Время подключения зарядки</div><input id="start" type="time" value="08:30"></div>
+  <button id="calc">Рассчитать время отключения</button>
+ </section>
+ <section class="result hidden" id="result" aria-live="polite">
+  <small>ЗАРЯЖАТЬ ПРИМЕРНО</small><div class="duration" id="duration">15 ч 14 мин</div>
+  <small>ОТКЛЮЧИТЬ ЗАРЯДКУ В</small><div class="endtime" id="endtime">23:44</div>
+  <div class="hint" id="daynote"></div>
+ </section>
+ <div class="footer">Расчёт пропорциональный: фактическое время может отличаться из-за изменения мощности, температуры и балансировки батареи. Значения сохраняются на этом устройстве.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const ids=['current','target','hours','minutes','start'];
+function save(){const s={};ids.forEach(id=>s[id]=$(id).value);try{localStorage.setItem('ev-charge-settings',JSON.stringify(s))}catch(e){}}
+try{const s=JSON.parse(localStorage.getItem('ev-charge-settings')||'{}');ids.forEach(id=>{if(s[id]!==undefined)$(id).value=s[id]})}catch(e){}
+function labels(){$('currentLabel').textContent=$('current').value+'%';$('targetLabel').textContent=$('target').value+'%'}
+ids.forEach(id=>$(id).addEventListener('input',()=>{labels();save()}));labels();
+$('calc').addEventListener('click',()=>{
+ const c=Number($('current').value),t=Number($('target').value),h=Number($('hours').value),m=Number($('minutes').value),st=$('start').value;
+ if(!st||!Number.isFinite(h)||!Number.isFinite(m)||h<0||m<0||m>59||h*60+m<=0||t<=c){alert('Проверь значения: целевой заряд должен быть выше текущего, а время до 100% — больше нуля.');return}
+ const mins=Math.round((h*60+m)*(t-c)/(100-c));
+ const start=st.split(':').map(Number),end=start[0]*60+start[1]+mins;
+ const hh=Math.floor(mins/60),mm=mins%60;
+ $('duration').textContent=hh+' ч '+String(mm).padStart(2,'0')+' мин';
+ $('endtime').textContent=String(Math.floor((end%1440)/60)).padStart(2,'0')+':'+String(end%60).padStart(2,'0');
+ $('daynote').textContent=end>=1440?'Время отключения — на следующие сутки.':'';
+ $('result').classList.remove('hidden');save();
+});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
+</script>
+</body></html>
